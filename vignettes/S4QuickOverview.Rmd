@@ -1,0 +1,609 @@
+---
+title: " S4 class system overview"
+author: "Hervé Pagès"
+email: "hpages.on.github@gmail.com"
+date: June 2016
+package: S4Vectors
+output:
+  BiocStyle::html_document:
+    number_sections: no
+    toc: yes
+    toc_depth: 2
+abstract: |
+  A quick overview of the S4 class system
+vignette: |
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+
+```{r setup, include=FALSE, echo=FALSE, R.options=(width=60)}
+knitr::opts_chunk$set(echo = TRUE)
+library(Matrix)
+library(IRanges) 
+library(graph)
+library(S4Vectors)
+```
+
+# What is S4?
+
+## The S4 class system
+
+-   The *S4 class system* is a set of facilities provided in R for OO
+    programming.
+
+-   Implemented in the *methods* package.
+
+-   On a fresh *R* session:
+
+    _> sessionInfo()_
+
+    _..._
+
+    attached base packages:
+
+    [1] stats graphics grDevices utils datasets
+  
+    [6] methods base
+
+-   R also supports an older class system: the *S3 class system*.
+
+
+
+## A different world
+
+### The syntax
+
+   _> foo(x, ...)_
+  
+    not:
+
+   _> x.foo(...)_
+
+
+    like in other OO programming languages.
+
+### The central concepts
+
+- The core components: *classes*[^1], *generic functions* and
+    *methods*
+
+- The glue: *method dispatch* (supports *simple* and *multiple* dispatch)
+
+
+## The result
+
+  _> ls('package:methods')_
+  
+
+     [1] "addNextMethod"           "allGenerics"
+     [3] "allNames"                "Arith"
+     [5] "as"                      "as<-"
+     [7] "asMethodDefinition"      "assignClassDef"
+     ...
+     [211] "testVirtual"           "traceOff"
+     [213] "traceOn"               "tryNew"
+     [215] "unRematchDefinition"   "validObject"
+     [217] "validSlotNames"
+
+* Rich, complex, can be intimidating
+
+* The classes and methods we implement in our packages can be hard to
+    document, especially when the class hierarchy is complicated and
+    multiple dispatch is used
+
+
+
+## S4 in Bioconductor
+
+-   Heavily used. In BioC 3.3: 3158 classes and 22511 methods defined in
+    609 packages! (out of 1211 software packages)
+
+-   Top 10: 128 classes in *ChemmineOB*, 98 in *flowCore*, 79 in
+    *IRanges*, 68 in *rsbml*, 61 in *ShortRead*, 58 in *Biostrings*, 51
+    in *rtracklayer*, 50 in *oligoClasses*, 45 in *flowUtils*, and 40 in
+    *BaseSpaceR*.
+
+-   For the end user: it's mostly transparent. But when something goes
+    wrong, error messages issued by the S4 class system can be hard to
+    understand. Also it can be hard to find the documentation for a
+    specific method.
+
+-   Most Bioconductor packages use only a small subset of the S4
+    capabilities (covers 99.99% of our needs)
+
+
+# S4 from an end-user point of view
+
+## Where do S4 objects come from?
+
+### From a dataset
+
+_> library(graph)_
+
+_> data(apopGraph)_
+
+_> apopGraph_
+
+
+A graphNEL graph with directed edges
+
+Number of Nodes = 50
+
+Number of Edges = 59
+
+
+### From using an object constructor function
+
+_> library(IRanges)_
+
+_> IRanges(start=c(101, 25), end=c(110, 80))_
+
+IRanges object with 2 ranges and 0 metadata columns:
+
+          start      end     width
+
+      <integer> <integer> <integer>
+
+    [1]    101      110        10
+
+    [2]     25       80        56
+
+### From a coercion
+
+_> library(Matrix)_
+
+_> m <- matrix(3:-4, nrow=2)_
+
+_> as(m, "Matrix")_
+
+2 x 4 Matrix of class "dgeMatrix"
+
+         [,1]  [,2]  [,3]  [,4]
+
+    [1,]  3     1     -1    -3
+
+    [2,]  2     0     -2    -4
+
+### From using a specialized high-level constructor
+
+_> library(GenomicFeatures)_
+
+_> makeTxDbFromUCSC("sacCer2", tablename="ensGene")_
+
+    TxDb object:
+
+    # Db type: TxDb
+
+    # Supporting package: GenomicFeatures
+
+    # Data source: UCSC
+
+    # Genome: sacCer2
+
+    # Organism: Saccharomyces cerevisiae
+
+    # Taxonomy ID: 4932
+
+    # UCSC Table: ensGene
+
+    # UCSC Track: Ensembl Genes
+
+    ...
+
+### From using a high-level I/O function
+
+  _> library(ShortRead)_
+
+  _> path_to_my_data <- system.file(_
+
+  _+ package="ShortRead",_
+
+  _+ "extdata", "Data", "C1-36Firecrest", "Bustard", "GERALD")_
+  
+  _> lane1 <- readFastq(path_to_my_data, pattern="s_1_sequence.txt")_
+
+  _> lane1_
+
+    class: ShortReadQ
+
+    length: 256 reads; width: 36 cycles
+
+### Inside another object
+
+  _> sread(lane1)_
+    
+    DNAStringSet object of length 256:
+    
+    width seq
+    
+    [1] 36 GGACTTTGTAGGATACCCTCGCTTTCCTTCTCCTGT
+    
+    [2] 36 GATTTCTTACCTATTAGTGGTTGAACAGCATCGGAC
+    
+    [3] 36 GCGGTGGTCTATAGTGTTATTAATATCAATTTGGGT
+    
+    [4] 36 GTTACCATGATGTTATTTCTTCATTTGGAGGTAAAA
+    
+    [5] 36 GTATGTTTCTCCTGCTTATCACCTTCTTGAAGGCTT
+    
+    ... ... ...
+    
+    [252] 36 GTTTAGATATGAGTCACATTTTGTTCATGGTAGAGT
+    
+    [253] 36 GTTTTACAGACACCTAAAGCTACATCGTCAACGTTA
+    
+    [254] 36 GATGAACTAAGTCAACCTCAGCACTAACCTTGCGAG
+
+\newpage
+
+## How to manipulate S4 objects?
+
+### Low-level: getters and setters
+
+  _> ir <- IRanges(start=c(101, 25), end=c(110, 80))_
+  
+  _> width(ir)_
+  
+    [1] 10 56
+    
+_> width(ir) <- width(ir) - 5_
+
+_> ir_
+
+IRanges object with 2 ranges and 0 metadata columns:
+
+          start      end     width
+
+      <integer> <integer> <integer>
+
+    [1]    101      105         5
+
+    [2]     25       75        51
+    
+
+### High-level: plenty of specialized methods
+
+_> qa1 <- qa(lane1, lane="lane1")_
+
+_> class(qa1)_
+
+    [1] "ShortReadQQA"
+
+    attr(,"package")
+
+    [1] "ShortRead"
+
+
+## How to find the right man page?
+
+-   `class?graphNEL` or equivalently `` ?`graphNEL-class` `` for
+    accessing the man page of a class
+
+-   `?qa` for accessing the man page of a generic function
+
+-   The man page for a generic might also document some or all of the
+    methods for this generic. The *See Also:* section might give a clue.
+    Also using `showMethods()` can be useful:
+    
+    _> showMethods("qa")_
+    
+    Function: qa (package ShortRead)
+    
+    dirPath="ShortReadQ"
+    
+    dirPath="SolexaPath"
+    
+    dirPath="character"
+    
+    dirPath="list"
+
+-   `` ?`qa,ShortReadQ-method` `` to access the man page for a
+    particular method (might be the same man page as for the generic)
+
+-   In doubt: `??qa` will search the man pages of all the installed
+    packages and return the list of man pages that contain the string
+    `qa`
+
+
+## Inspecting objects and discovering methods
+
+-   `class()` and `showClass()`
+
+    _> class(lane1)_
+
+    [1] "ShortReadQ"
+    
+    attr(,"package")
+    
+    [1] "ShortRead"
+    
+    *> showClass("ShortReadQ")*
+  
+        Class "ShortReadQ" [package "ShortRead"]
+   
+    
+        Slots:
+
+ 
+        Name:         quality            sread            id
+    
+        Class:    QualityScore     DNAStringSet    BStringSet
+
+    
+        Extends:
+    
+        Class "ShortRead", directly
+    
+        Class ".ShortReadBase", by class "ShortRead", distance 2
+   
+    
+        Known Subclasses: "AlignedRead"
+
+-   `str()` for compact display of the content of an object
+
+-   `showMethods()` to discover methods
+
+-   `selectMethod()` to see the code
+
+\newpage
+# Implementing an S4 class (in 4 slides)
+
+
+## Class definition and constructor
+
+### Class definition
+
+  _> setClass("SNPLocations",_
+    
+  _+ &emsp;&emsp;slots=c(_
+      
+  _+ &emsp;&emsp;&emsp; genome="character", # a single string_
+      
+  _+&emsp;&emsp;&emsp;  snpid="character", # a character vector of length N_
+                
+  _+&emsp;&emsp;&emsp;  chrom="character", # a character vector of length N_
+                
+  _+&emsp;&emsp;&emsp;  pos="integer" # an integer vector of length N_
+                
+  _+ &emsp;&emsp;)_
+                
+  _+&emsp;)_
+
+
+### Constructor
+
+  _>SNPLocations <- function(genome, snpid, chrom, pos)_
+
+  _+ &emsp;&emsp;new("SNPLocations", genome=genome, snpid=snpid, chrom=chrom, pos=pos)_ 
+
+
+  _> snplocs <- SNPLocations("hg19",_
+    
+  _+ &emsp;&emsp;&emsp;c("rs0001", "rs0002"),_
+      
+  _+ &emsp;&emsp;&emsp;c("chr1", "chrX"),_
+      
+  _+ &emsp;&emsp;&emsp;c(224033L, 1266886L))_
+  
+
+
+## Getters
+
+### Defining the `length` method 
+
+_> setMethod("length", "SNPLocations", function(x) length(x@snpid))_
+
+_> length(snplocs) # just testing_
+
+  [1]&emsp;2
+
+### Defining the slot getters
+_> setGeneric("genome", function(x) standardGeneric("genome"))_
+
+_> setMethod("genome", "SNPLocations", function(x) x@genome)_
+
+_> setGeneric("snpid", function(x) standardGeneric("snpid"))_
+
+_> setMethod("snpid", "SNPLocations", function(x) x@snpid)_
+
+_> setGeneric("chrom", function(x) standardGeneric("chrom"))_
+
+_> setMethod("chrom", "SNPLocations", function(x) x@chrom)_
+
+_> setGeneric("pos", function(x) standardGeneric("pos"))_
+
+_> setMethod("pos", "SNPLocations", function(x) x@pos)_
+
+_> genome(snplocs) # just testing_
+
+  [1]&emsp;"hg19"
+
+_> snpid(snplocs) # just testing_
+
+  [1]&emsp;"rs0001"&emsp;"rs0002"
+
+
+### Defining the `show` method 
+
+  _> setMethod("show", "SNPLocations",_
+
+  _+ &emsp;&emsp;function(object)_
+
+  _+ &emsp;&emsp;&emsp;cat(class(object), "instance with", length(object),_
+
+  _+ &emsp;&emsp;&emsp;&emsp;"SNPs on genome", genome(object), "\n")_
+
+  _+ )_
+
+  _> snplocs # just testing_
+
+SNPLocations instance with 2 SNPs on genome hg19
+
+::: block
+Defining the *validity method*
+
+\<\<validity,results=hide\>\>= setValidity(\"SNPLocations\",
+function(object) if (!is.character(genome(object)) \|\|
+length(genome(object)) != 1 \|\| is.na(genome(object)))
+return(\"'genome' slot must be a single string\") slot_lengths \<-
+c(length(snpid(object)), length(chrom(object)), length(pos(object))) if
+(length(unique(slot_lengths)) != 1) return(\"lengths of slots 'snpid',
+'chrom' and 'pos' differ\") TRUE ) @
+
+::: Schunk
+::: Sinput
+\> snplocs@chrom \<- LETTERS\[1:3\] \# a very bad idea! \>
+validObject(snplocs)
+:::
+
+::: Soutput
+Error in validObject(snplocs) : invalid class \"SNPLocations\" object:
+lengths of slots 'snpid', 'chrom' and 'pos' differ
+:::
+:::
+:::
+:::
+
+::: frame
+### 
+
+::: block
+Defining slot setters
+
+\<\<set_chrom,results=hide\>\>= setGeneric(\"chrom\<-\", function(x,
+value) standardGeneric(\"chrom\<-\")) setReplaceMethod(\"chrom\",
+\"SNPLocations\", function(x, value) x@chrom \<- value; validObject(x);
+x) @ \<\<test_slot_setters\>\>= chrom(snplocs) \<- LETTERS\[1:2\] \#
+repair currently broken object @
+
+::: Schunk
+::: Sinput
+\> chrom(snplocs) \<- LETTERS\[1:3\] \# try to break it again
+:::
+
+::: Soutput
+Error in validObject(x) : invalid class \"SNPLocations\" object: lengths
+of slots 'snpid', 'chrom' and 'pos' differ
+:::
+:::
+:::
+
+::: block
+Defining a coercion method \<\<setAs,results=hide\>\>=
+setAs(\"SNPLocations\", \"data.frame\", function(from)
+data.frame(snpid=snpid(from), chrom=chrom(from), pos=pos(from)) ) @
+\<\<test_coercion\>\>= as(snplocs, \"data.frame\") \# testing @
+:::
+:::
+
+# Extending an existing class
+
+::: frame
+### Slot inheritance
+
+-   Most of the time (but not always), the child class will have
+    additional slots: \<\<AnnotatedSNPs\>\>= setClass(\"AnnotatedSNPs\",
+    contains=\"SNPLocations\", slots=c( geneid=\"character\" \# a
+    character vector of length N ) ) @
+
+-   The slots from the parent class are inherited:
+    \<\<slot_inheritance\>\>= showClass(\"AnnotatedSNPs\") @
+
+-   Constructor: \<\<AnnotatedSNPs\>\>= AnnotatedSNPs \<-
+    function(genome, snpid, chrom, pos, geneid) new(\"AnnotatedSNPs\",
+    SNPLocations(genome, snpid, chrom, pos), geneid=geneid) @
+:::
+
+::: frame
+### Method inheritance
+
+-   Let's create an AnnotatedSNPs object: \<\<method_inheritance\>\>=
+    snps \<- AnnotatedSNPs(\"hg19\", c(\"rs0001\", \"rs0002\"),
+    c(\"chr1\", \"chrX\"), c(224033L, 1266886L), c(\"AAU1\",
+    \"SXW-23\")) @
+
+-   All the methods defined for SNPLocations objects work
+    out-of-the-box: \<\<method_inheritance\>\>= snps @
+
+-   But sometimes they don't do the right thing:
+    \<\<as_data_frame_is_not_right\>\>= as(snps, \"data.frame\") \# the
+    'geneid' slot is ignored @
+:::
+
+::: frame
+### 
+
+-   Being a SNPLocations *object* vs being a SNPLocations *instance*:
+    \<\<\>\>= is(snps, \"AnnotatedSNPs\") \# 'snps' is an AnnotatedSNPs
+    object is(snps, \"SNPLocations\") \# and is also a SNPLocations
+    object class(snps) \# but is \*not\* a SNPLocations \*instance\* @
+
+-   Method overriding: for example we could define a `show` method for
+    AnnotatedSNPs objects. `callNextMethod` can be used in that context
+    to call the method defined for the parent class from within the
+    method for the child class.
+
+-   Automatic coercion method: \<\<automatic_coercion_method\>\>=
+    as(snps, \"SNPLocations\") @
+:::
+
+::: frame
+### Incremental validity method
+
+-   The *validity method* for AnnotatedSNPs objects only needs to
+    validate what's not already validated by the *validity method* for
+    SNPLocations objects:
+    \<\<incremental_validity_method,results=hide\>\>=
+    setValidity(\"AnnotatedSNPs\", function(object) if
+    (length(object@geneid) != length(object)) return(\"'geneid' slot
+    must have the length of the object\") TRUE ) @
+
+-   In other words: before an AnnotatedSNPs object can be considered
+    valid, it must first be a valid SNPLocations object.
+:::
+
+# What else?
+
+::: frame
+### 
+
+::: block
+Other important S4 features
+
+-   *Virtual* classes: equivalent to *abstract* classes in Java
+
+-   Class unions (see `?setClassUnion`)
+
+-   Multiple inheritance: a powerful feature that should be used with
+    caution. If used inappropriately, can lead to a class hierarchy that
+    is very hard to maintain
+:::
+
+::: block
+Resources
+
+-   Man pages in the *methods* package: `?setClass`, `?showMethods`,
+    `?selectMethod`, `?getMethod`, `?is`, `?setValidity`, `?as`
+
+-   The *Extending RangedSummarizedExperiment* section of the
+    *SummarizedExperiment* vignette in the *SummarizedExperiment*
+    package.
+
+-   Note: S4 is *not* covered in the *An Introduction to R* or *The R
+    language definition* manuals[^2]
+
+-   The *Writing R Extensions* manual for details about integrating S4
+    classes to a package
+
+-   The *R Programming for Bioinformatics* book by Robert Gentleman[^3]
+:::
+:::
+
+[^1]: also called *formal classes*, to distinguish them from the S3
+    classes aka *old style classes*
+
+[^2]: http://cran.fhcrc.org/manuals.html
+
+[^3]: http://bioconductor.org/help/publications/books/r-programming-for-bioinformatics/
